@@ -116,7 +116,15 @@ function getBearerToken(request) {
   return authHeader.slice("Bearer ".length).trim();
 }
 
+let spotifyRetryAt = 0;
+const spotifyProfileCache = new Map();
 function spotifyGet(pathname, accessToken) {
+  if (Date.now() < spotifyRetryAt) {
+    const error = new Error("Spotify rate limit reached. Requests are paused until retry is allowed.");
+    error.statusCode = 429;
+    error.retryAfter = Math.max(1, Math.ceil((spotifyRetryAt - Date.now()) / 1000));
+    return Promise.reject(error);
+  }
   return new Promise((resolve, reject) => {
     const request = https.request(
       {
@@ -153,17 +161,37 @@ function spotifyGet(pathname, accessToken) {
 
           const error = new Error(payload?.error?.message || payload?.error_description || "Spotify request failed");
           error.statusCode = response.statusCode || 500;
+          if (error.statusCode === 429) {
+            const seconds = Number(response.headers["retry-after"]);
+            error.retryAfter = Number.isFinite(seconds) && seconds > 0 ? Math.ceil(seconds) : 30;
+            spotifyRetryAt = Math.max(spotifyRetryAt, Date.now() + error.retryAfter * 1000);
+            error.message = "Spotify rate limit reached. Requests are paused until retry is allowed.";
+          }
           reject(error);
         });
       }
     );
 
     request.on("error", reject);
+    request.setTimeout(12000, () => request.destroy(new Error("Spotify request timed out")));
     request.end();
   });
 }
 
-async function getSpotifyUser(accessToken) {
+function getSpotifyUser(accessToken) {
+  const cached = spotifyProfileCache.get(accessToken);
+  if (cached && cached.expiresAt > Date.now()) return cached.promise;
+  if (spotifyProfileCache.size >= 256) spotifyProfileCache.delete(spotifyProfileCache.keys().next().value);
+  const entry = { expiresAt: Date.now() + 60000 };
+  entry.promise = fetchSpotifyUser(accessToken).catch(error => {
+    if (spotifyProfileCache.get(accessToken) === entry) spotifyProfileCache.delete(accessToken);
+    throw error;
+  });
+  spotifyProfileCache.set(accessToken, entry);
+  return entry.promise;
+}
+
+async function fetchSpotifyUser(accessToken) {
   const profile = await spotifyGet("/v1/me", accessToken);
 
   return {
@@ -1231,8 +1259,10 @@ async function requestHandler(request, response) {
     sendJson(response, 404, { error: "Not found" });
   } catch (error) {
     console.error(error);
+    if (error.retryAfter) response.setHeader("Retry-After", String(error.retryAfter));
     sendJson(response, error.statusCode || 500, {
-      error: error.message || "Internal server error"
+      error: error.message || "Internal server error",
+      ...(error.retryAfter ? { retryAfter: error.retryAfter } : {})
     });
   }
 }
