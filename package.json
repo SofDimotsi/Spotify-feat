@@ -6,7 +6,7 @@
   "scripts": {
     "start": "node server.js",
     "smoke": "node smoke-test.js",
-    "test:ui": "node tests/loading.cjs && node tests/refresh.cjs && node tests/location.cjs && node tests/playback.cjs && node tests/rate-limit.cjs",
+    "test:ui": "node tests/loading.cjs && node tests/refresh.cjs && node tests/location.cjs && node tests/playback.cjs && node tests/rate-limit.cjs && node tests/login.cjs",
     "test:server": "node tests/server-rate-limit.cjs"
   },
   "devDependencies": {
