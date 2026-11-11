@@ -891,13 +891,30 @@
     .playback-state { display: inline-flex; align-items: center; gap: 5px; border: 1px solid var(--line); border-radius: 999px; padding: 0 6px; font-size: 11px; font-weight: bold; line-height: 1; color: var(--muted); background: var(--raised); }
     .playback-state.is-playing { color: var(--accent); background: var(--surface); }
     @media (max-height: 600px) { .track-heading { margin-bottom: 2px; gap: 4px 8px; } .playback-state { padding: 0 6px; font-size: 10px; } }
+    .card.is-logged-out {
+      width: min(460px, 100%); height: auto; max-height: 100%; overflow-y: auto;
+      grid-template-columns: minmax(0, 1fr); grid-template-rows: auto auto auto auto;
+      padding: clamp(20px, 5vw, 32px); gap: 24px;
+    }
+    .card.is-logged-out #status { grid-row: 2; min-height: 0; padding: 0; background: transparent; border: 0; text-align: center; }
+    .card.is-logged-out .track-panel { display: block; }
+    .card.is-logged-out .track-cover, .card.is-logged-out .track-heading { display: none; }
+    .card.is-logged-out .track-title { font-size: 20px; margin-bottom: 10px; }
+    .card.is-logged-out #login-btn { grid-row: 3; justify-self: center; min-height: 44px; }
+    .card.is-logged-out .app-footer {
+      position: fixed; right: 24px; bottom: 24px;
+      width: auto; z-index: 3;
+    }
+    @media (max-width: 700px), (max-height: 450px) {
+      .card.is-logged-out .app-footer { right: 16px; bottom: 16px; }
+    }
     .hidden {
       display: none;
     }
   </style>
 </head>
 <body>
-  <div class="card">
+  <div class="card is-logged-out">
     <header class="app-header">
       <div class="brand"><h1>Spotify Buddies</h1></div>
       <span id="appearance-status" class="sr-only" role="status"></span>
@@ -1489,6 +1506,7 @@
     }
 
     function setProfile(profile) {
+      document.querySelector('.card').classList.toggle('is-logged-out', !profile);
       if (!profile) {
         currentUserId = null;
         profileSection.classList.add("hidden");
@@ -2623,6 +2641,7 @@ async function startup() {
 
   if (activeToken) {
     spotifyAccessToken = activeToken;
+    document.querySelector('.card').classList.remove('is-logged-out');
     loginBtn.style.display = "none";
     connectLiveUpdates();
     // Start all initial work together, then release every skeleton in one update.
@@ -2669,8 +2688,8 @@ async function startup() {
     setProfile(null);
     currentTrackState = {
       label: "nothing playing right now",
-      title: "Not connected",
-      artist: "Log in with Spotify to see your current track.",
+      title: "Find your people through music",
+      artist: "Connect Spotify to see what’s playing and discover listeners nearby.",
       artworkUrl: "",
       trackUrl: ""
     };
